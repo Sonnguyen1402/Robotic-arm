@@ -30,7 +30,7 @@ T_base_tag = Transform(Rotation.identity(), [0.50, 0.00, 0.0])
 round_id = 0
 
 
-class PandaGraspController(object):
+class DobotGraspController(object):
     def __init__(self, args):
         self.robot_error = False
 
@@ -328,13 +328,13 @@ class TSDFServer(object):
 
 
 def main(args):
-    rospy.init_node("panda_grasp")
-    panda_grasp = PandaGraspController(args)
+    rospy.init_node("dobot_grasp")
+    dobot_grasp = DobotGraspController(args)
 
     while True:
-        panda_grasp.run()
+        dobot_grasp.run()
         rospy.sleep(2)
-    # panda_grasp.run()
+    # dobot_grasp.run()
 
 
 if __name__ == "__main__":
