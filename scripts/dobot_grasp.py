@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
 """
-Open-loop grasp execution using a Panda arm and wrist-mounted RealSense camera.
+Open-loop grasp execution using a Dobot CR5 arm and fixed Kinect v1 camera.
 """
 
 import argparse
 from pathlib import Path
 
 import cv_bridge
-#import franka_msgs.msg
-import geometry_msgs.msg
+# import franka_msgs.msg
+# import geometry_msgs.msg
 import numpy as np
 import rospy
 import sensor_msgs.msg
@@ -313,10 +313,9 @@ class TSDFServer(object):
         self.high_res_tsdf = TSDFVolume(self.size, 120)
 
     def sensor_cb(self, msg):
-        # print("Sensor_cb")
         if not self.integrate:
             return
-        
+        print("Run Sensor_cb")
         img = self.cv_bridge.imgmsg_to_cv2(msg).astype(np.float32) * 0.001
         T_cam_task = self.tf_tree.lookup(
             self.cam_frame_id, "task", msg.header.stamp, rospy.Duration(0.1)
