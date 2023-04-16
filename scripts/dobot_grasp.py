@@ -26,7 +26,7 @@ from tcp_client import Control_Dobot_TCP
 
 import sys
 # tag lies on the table in the center of the workspace
-T_base_tag = Transform(Rotation.identity(), [0.42, 0.02, 0.21])
+T_base_tag = Transform(Rotation.identity(), [0.50, 0.00, 0.0])
 round_id = 0
 
 
@@ -41,7 +41,7 @@ class PandaGraspController(object):
         #self.finger_depth = rospy.get_param("~finger_depth") # 0.05
         #self.size = 6.0 * self.finger_depth # 0.3
         #self.scan_joints = rospy.get_param("~scan_joints") # 4 goc quet 
-        self.T_tool0_tcp = Transform(Rotation.from_quat([0.000, 0.000, -0.382, 0.924]), [0.000, 0.000, 0.065])
+        self.T_tool0_tcp = Transform(Rotation.from_quat([0.000, 0.000, -0.382, 0.924]), [0.000, 0.000, 0.1345])
         self.T_tcp_tool0 = self.T_tool0_tcp.inverse()
         print("T_tcp_tool0: ", self.T_tool0_tcp.translation)
         self.finger_depth =  0.05
@@ -73,7 +73,8 @@ class PandaGraspController(object):
 
     def define_workspace(self):
         z_offset = -0.06
-        t_tag_task = np.r_[[-0.5 * self.size, -0.5 * self.size, z_offset]]
+        # t_tag_task = np.r_[[-0.5 * self.size, -0.5 * self.size, z_offset]]
+        t_tag_task = np.r_[[-0.25, 0.0, -0.06]]
         T_tag_task = Transform(Rotation.identity(), t_tag_task)
         self.T_base_task = T_base_tag * T_tag_task
 
@@ -85,7 +86,7 @@ class PandaGraspController(object):
         self.task_frame_id = "task"
         self.cam_frame_id = "camera_depth_optical_frame"
         self.T_cam_task = Transform(
-            Rotation.from_euler('xyz', [178.7, 12, 90], degrees=True), [-0.066, -0.151, 0.712]) # [-0.679, 0.726, -0.074, -0.081] 0.166, 0.101, 0.515
+            Rotation.from_euler('xyz', [178.7, 12, 90], degrees=True), [0.006, -0.251, 0.712]) # [-0.679, 0.726, -0.074, -0.081] 0.166, 0.101, 0.515
 
         # broadcast the tf tree (for visualization)
         # self.tf_tree = ros_utils.TransformTree()
@@ -257,9 +258,10 @@ class PandaGraspController(object):
 
         # self.dobot.goto_pose(self.modify_pose(T_base_retreat * self.T_tcp_tool0))
 
-        # # lift hand
-        # T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.1])
-        # T_base_lift = T_retreat_lift_base * T_base_retreat
+        # lift hand
+        T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.05])
+        T_base_lift = T_retreat_lift_base * T_base_retreat
+        self.modify_pose(T_base_lift * self.T_tcp_tool0)
         # self.dobot.goto_pose(self.modify_pose(T_base_lift * self.T_tcp_tool0))
         
         # if not comfirm_grasp:
@@ -280,8 +282,8 @@ class PandaGraspController(object):
     #     #     [0.678, 0.097, 0.237, -1.63, -0.031, 1.756, 0.931], 0.2, 0.2
     #     # )
     #     # self.pc.move_gripper(0.08)
-    #     self.dobot.goto_pose([550, -50, 450, 179, -0.9, 2])
-    #     self.dobot.goto_pose([550, -50, 300, 179, -0.9, 2])
+    #     self.dobot.goto_pose([550, -50, 450, 179, -0.9, 179])
+    #     self.dobot.goto_pose([550, -50, 300, 179, -0.9, 179])
     #     self.dobot.open_gripper()
 
 

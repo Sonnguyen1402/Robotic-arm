@@ -183,7 +183,7 @@ class Control_Dobot_TCP (object):
         if self.sended_flag:
             print("Previous command hasn't been comfirmed!", self.command_name)
         else:
-            self.pose = [138, -244, 413, 179, -0.9, 2]
+            self.pose = [138, -244, 413, 179, -0.9, 179]
             strpose = re.sub("\[|\]", "", str(self.pose))
             self.command_name = "M"
             self.send_command("M, " + strpose)
