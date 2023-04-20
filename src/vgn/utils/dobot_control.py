@@ -1,9 +1,8 @@
 import socket
-import keyboard
 import re
-import errno
 from time import sleep
 import sys
+
 # import thread module
 from _thread import *
 import threading
@@ -47,7 +46,7 @@ class Control_Dobot_TCP (object):
             data = msg.split(",")
             if len(data) == 6:
                 floats_list = [float(x) for x in data]
-                print("Float list: ", floats_list)
+                # print("Float list: ", floats_list)
                 robot_pose = [round(elem, 4) for elem in floats_list]
                 return robot_pose
         except:
@@ -61,7 +60,7 @@ class Control_Dobot_TCP (object):
         # self.s.settimeout(5)
         try:
             self.s.sendall(bytes(command, "utf8"))
-            print("Command sended: ", command)
+            # print("Command sended: ", command)
             self.retry_counter = 0
             self.sended_flag = True
             self.command_executed = False

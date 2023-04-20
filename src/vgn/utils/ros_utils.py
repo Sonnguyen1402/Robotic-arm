@@ -54,7 +54,7 @@ def from_quat_msg(msg):
 def to_euler(orientaion):
     return orientaion.as_euler('xyz', degrees=True)
 
-def to_qua(orientation):
+def to_quat(orientation):
     return orientation.as_quat()
 
 def to_pose_msg(transform):
