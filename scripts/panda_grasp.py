@@ -8,7 +8,7 @@ import argparse
 from pathlib import Path
 
 import cv_bridge
-#import franka_msgs.msg
+import franka_msgs.msg
 import geometry_msgs.msg
 import numpy as np
 import rospy
@@ -50,12 +50,12 @@ class PandaGraspController(object):
         rospy.loginfo("Ready to take action")
 
     def setup_panda_control(self):
-        # rospy.Subscriber(
-        #     "/franka_state_controller/franka_states",
-        #     franka_msgs.msg.FrankaState,
-        #     self.robot_state_cb,
-        #     queue_size=1,
-        # )
+        rospy.Subscriber(
+            "/franka_state_controller/franka_states",
+            franka_msgs.msg.FrankaState,
+            self.robot_state_cb,
+            queue_size=1,
+        )
         rospy.Subscriber(
             "/joint_states", sensor_msgs.msg.JointState, self.joints_cb, queue_size=1
         )
@@ -85,9 +85,9 @@ class PandaGraspController(object):
         detected_error = False
         if np.any(msg.cartesian_collision):
             detected_error = True
-        # for s in franka_msgs.msg.Errors.__slots__:
-        #     if getattr(msg.current_errors, s):
-        #         detected_error = True
+        for s in franka_msgs.msg.Errors.__slots__:
+            if getattr(msg.current_errors, s):
+                detected_error = True
         if not self.robot_error and detected_error:
             self.robot_error = True
             rospy.logwarn("Detected robot error")
