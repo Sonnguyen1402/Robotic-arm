@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Open-loop grasp execution using a Dobot CR5 arm and fixed Kinect v1 camera.
+Open-loop grasp execution using a Dobot CR5 and fixed Kinect v1 camera.
 """
 
 import argparse
@@ -30,12 +30,12 @@ round_id = 0
 class DobotGraspController(object):
     def __init__(self, args):
         self.robot_error = False
-        self.T_gripper = config.T_gripper
+        self.T_gripper = Transform.from_dict(config.T_gripper)
         self.finger_depth = config.finger_depth
         self.size = 6.0 * self.finger_depth
-        self.dobot = Control_Dobot_TCP (('192.168.1.6', 6001))
+        self.dobot = Control_Dobot_TCP (('192.168.1.6', 6001)) # IP & Port of Robot Dobot
         self.dobot.run_listenner()
-
+        
         self.tf_tree = ros_utils.TransformTree()
         self.define_workspace()
         self.tsdf_server = TSDFServer()
@@ -44,24 +44,14 @@ class DobotGraspController(object):
         rospy.loginfo("Ready to take action")
 
     def define_workspace(self):
-        z_offset = -0.06
-        # t_tag_task = np.r_[[-0.5 * self.size, -0.5 * self.size, z_offset]]
-        t_tag_task = np.r_[[-0.25, 0.0, -0.07]]
-        T_tag_task = Transform(Rotation.identity(), t_tag_task)
+        # define robot pose
+        T_tag_task = Transform.from_dict(config.T_robot_base)
         self.T_base_task = T_base_tag * T_tag_task
-
-        rospy.loginfo("T_tag_task: %s", T_tag_task.translation)
-        rospy.loginfo("T_base_task: %s", self.T_base_task.translation)
-        # self.tf_tree.broadcast_static(self.T_base_task, self.base_frame_id, "task")
-        # self.tf_tree.broadcast_static(self.T_base_task, "camera_depth_optical_frame", "task")
-        # define frames
+        
+        # define camera pose
         self.task_frame_id = "task"
-        self.cam_frame_id = "camera_depth_optical_frame"
-        self.T_cam_task = Transform(
-            Rotation.from_euler('xyz', [178.9, 14, 90], degrees=True), [0.006, -0.251, 0.77]) # [-0.679, 0.726, -0.074, -0.081] 0.166, 0.101, 0.515
-
-        # broadcast the tf tree (for visualization)
-        # self.tf_tree = ros_utils.TransformTree()
+        self.cam_frame_id = config.cam_frame_id
+        self.T_cam_task = Transform.from_dict(config.T_cam_pose)
         self.tf_tree.broadcast_static(
             self.T_cam_task, self.cam_frame_id, self.task_frame_id
         )
@@ -100,15 +90,14 @@ class DobotGraspController(object):
         self.dobot.move_home()
 
     def to_pose_msg(self, pose):
-        tran_list = pose.translation.tolist()
-        rot_list = ros_utils.to_euler(pose.rotation).tolist()
-        pose_full = tran_list + rot_list
-        rospy.loginfo("------------------------------------")
-        rospy.loginfo("Pose raw: %s", pose_full)
+        translation_list = pose.translation.tolist()
+        rotation_list = ros_utils.to_euler(pose.rotation).tolist()
+        pose_full = translation_list + rotation_list
         newpose = pose_full
+        # Modify pose msg to work with Dobot's coordinate system
         new_x = 1000.0 * newpose[1]
-        new_y = (-1000.0 * newpose[0])
-        new_z = (1000.0 * newpose[2])  
+        new_y = -1000.0 * newpose[0]
+        new_z = 1000.0 * newpose[2]  
         newpose[0] = new_x
         newpose[1] = new_y
         newpose[2] = new_z
@@ -117,11 +106,8 @@ class DobotGraspController(object):
         else:
             newpose[5] = newpose[5] - 90.0
         pose_msg = [round(elem, 4) for elem in newpose]
-        rospy.loginfo("Pose msg: %s", pose_msg)
-        rospy.loginfo("------------------------------------")
         return pose_msg
         
-
     def acquire_tsdf(self):
         self.tsdf_server.reset()
         self.tsdf_server.integrate = True
@@ -153,61 +139,45 @@ class DobotGraspController(object):
         T_task_grasp = grasp.pose
         T_base_grasp = self.T_base_task * T_task_grasp
 
-        T_grasp_pregrasp = Transform(Rotation.identity(), [0.0, 0.0, -0.07])
-        T_grasp_retreat = Transform(Rotation.identity(), [0.0, 0.0, -0.07])
+        T_grasp_pregrasp = Transform(Rotation.identity(), [0.0, 0.0, -0.05])
+        T_grasp_retreat = Transform(Rotation.identity(), [0.0, 0.0, -0.05])
         T_base_pregrasp = T_base_grasp * T_grasp_pregrasp
-        T_base_retreat = T_base_grasp * T_grasp_retreat
+        T_base_retreat = T_base_grasp * T_grasp_retreat   
         
-        # print("T_task_grasp: ", T_task_grasp.translation )       
-        # print("T_base_grasp: ", self.T_tcp_tool0.translation)
-        # print("T_base_pregrasp: ", T_base_pregrasp.translation)
-        # print("T_base_retreat : ", T_base_retreat.translation)
-        # self.to_pose_msg(T_base_pregrasp * self.T_tcp_tool0)
-        # self.to_pose_msg(T_base_grasp * self.T_tcp_tool0)
-        
-        
-        comfirm_move = self.dobot.goto_pose(self.to_pose_msg(T_base_pregrasp * self.T_gripper))
-        if not comfirm_move:
-            return False
-        
-        comfirm_move = self.approach_grasp(T_base_grasp)
-        if not comfirm_move:
+        if not self.dobot.goto_pose(self.to_pose_msg(T_base_pregrasp * self.T_gripper)):
             return False
 
-        comfirm_grasp = self.dobot.grasp()
+        if not self.approach_grasp(T_base_grasp):
+            return False
 
-        comfirm_move = self.dobot.goto_pose(self.to_pose_msg(T_base_retreat * self.T_gripper))
+        label = self.dobot.grasp()
 
+        if not self.dobot.goto_pose(self.to_pose_msg(T_base_retreat * self.T_gripper)):
+            return False
+        
         # lift hand
-        T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.05])
+        T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.25])
         T_base_lift = T_retreat_lift_base * T_base_retreat
-        comfirm_move = self.dobot.goto_pose(self.to_pose_msg(T_base_lift * self.T_gripper))
-        if not comfirm_move:
+        if not self.dobot.goto_pose(self.to_pose_msg(T_base_lift * self.T_gripper)):
             return False
         
-        if not comfirm_grasp:
-            return False
-        else:
-            return True
+        return label
 
     def approach_grasp(self, T_base_grasp):
         return self.dobot.goto_pose(self.to_pose_msg(T_base_grasp * self.T_gripper))
 
     def drop(self):
-        self.dobot.goto_pose([550, -50, 450, 179, -0.9, 179])
+        self.dobot.goto_pose([550, -50, 550, 179, -0.9, 179])
         self.dobot.goto_pose([550, -50, 300, 179, -0.9, 179])
         self.dobot.open_gripper()
 
 
 class TSDFServer(object):
     def __init__(self):
-        self.cam_frame_id = "camera_depth_optical_frame"
-        self.cam_topic_name = "/camera/depth/image_rect_raw" # /camera/depth/image_rect_raw
-        self.intrinsic = CameraIntrinsic(640, 480, 580.265, 580.26, 310.39, 230.43)
-        # height: 480 CameraIntrinsic(640, 480, 525.26, 525.26, 319.39, 242.43) 235.43
-        # width: 848
-        # K: [423.189, 0.0, 423.336, 0.0, 423.18, 242.692, 0.0, 0.0, 1.0]
-        self.size = 6.0 * 0.05 # 0.05
+        self.cam_frame_id = config.cam_frame_id
+        self.cam_topic_name = config.cam_topic_name
+        self.intrinsic = CameraIntrinsic.from_dict(config.cam_intrinsic)
+        self.size = 6.0 * config.finger_depth
 
         self.cv_bridge = cv_bridge.CvBridge()
         self.tf_tree = ros_utils.TransformTree()
@@ -233,11 +203,9 @@ class TSDFServer(object):
 def main(args):
     rospy.init_node("dobot_grasp")
     dobot_grasp = DobotGraspController(args)
-
+    
     while True:
         dobot_grasp.run()
-        
-    # dobot_grasp.run()
 
 
 if __name__ == "__main__":
