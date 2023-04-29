@@ -23,17 +23,18 @@ from vgn.utils.transform import Rotation, Transform
 from vgn.utils.dobot_control import Control_Dobot_TCP
 
 # tag lies on the table in the center of the workspace
-T_base_tag = Transform(Rotation.identity(), [0.50, 0.00, 0.14])
+T_base_tag = Transform(Rotation.identity(), [0.50, 0.00, 0.115])
 round_id = 0
 
 
 class DobotGraspController(object):
     def __init__(self, args):
-        self.robot_error = False
         self.T_gripper = Transform.from_dict(config.T_gripper)
+        T_ground_box = Transform(Rotation.identity(), [0.0, 0.0, 0.115])
+        self.T_no_box = self.T_gripper * T_ground_box
         self.finger_depth = config.finger_depth
         self.size = 6.0 * self.finger_depth
-        self.dobot = Control_Dobot_TCP (('192.168.1.6', 6001)) # IP & Port of Robot Dobot
+        self.dobot = Control_Dobot_TCP (('127.0.0.1', 8001)) # IP & Port of Robot Dobot ('192.168.1.6', 6001)
         self.dobot.run_listenner()
         
         self.tf_tree = ros_utils.TransformTree()
@@ -60,7 +61,6 @@ class DobotGraspController(object):
     def run(self):
         vis.clear()
         vis.draw_workspace(self.size)
-        self.dobot.open_gripper()
         self.dobot.move_home()
 
         tsdf, pc = self.acquire_tsdf()
@@ -76,18 +76,16 @@ class DobotGraspController(object):
         if len(grasps) == 0:
             rospy.loginfo("No grasps detected")
             return
+        else:
+            self.dobot.open_gripper()
 
         grasp, score = self.select_grasp(grasps, scores)
         vis.draw_grasp(grasp, score, self.finger_depth)
         rospy.loginfo("Selected grasp")
 
-        label = self.execute_grasp(grasp)
+        self.execute_grasp(grasp)
         rospy.loginfo("Grasp execution")
 
-        if label:
-            self.drop()
-            rospy.loginfo("Object Grasped")
-        self.dobot.move_home()
 
     def to_pose_msg(self, pose):
         translation_list = pose.translation.tolist()
@@ -106,6 +104,8 @@ class DobotGraspController(object):
         else:
             newpose[5] = newpose[5] - 90.0
         pose_msg = [round(elem, 4) for elem in newpose]
+        rospy.loginfo(pose_msg)
+        rospy.loginfo("---------------------------------")
         return pose_msg
         
     def acquire_tsdf(self):
@@ -156,21 +156,27 @@ class DobotGraspController(object):
             return False
         
         # lift hand
-        T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.25])
+        T_retreat_lift_base = Transform(Rotation.identity(), [0.0, 0.0, 0.20])
         T_base_lift = T_retreat_lift_base * T_base_retreat
         if not self.dobot.goto_pose(self.to_pose_msg(T_base_lift * self.T_gripper)):
             return False
         
-        return label
+        if label:
+            rospy.loginfo("Object Grasped")
+            self.drop(T_base_grasp)
+
 
     def approach_grasp(self, T_base_grasp):
         return self.dobot.goto_pose(self.to_pose_msg(T_base_grasp * self.T_gripper))
 
-    def drop(self):
-        self.dobot.goto_pose([550, -50, 550, 179, -0.9, 179])
-        self.dobot.goto_pose([550, -50, 300, 179, -0.9, 179])
+    def drop(self, T_base_grasp):
+        z_drop = self.to_pose_msg(T_base_grasp * self.T_no_box)[2]
+        if z_drop < 110.0:
+            z_drop = 110.0
+        self.dobot.goto_pose([550, -50, z_drop + 200.0, 179, -0.9, -90]) 
+        self.dobot.goto_pose([550, -50, z_drop, 179.0, -0.9, -90])
         self.dobot.open_gripper()
-
+        self.dobot.goto_pose([550, -150, z_drop + 100.0, 179, -0.9, 179])
 
 class TSDFServer(object):
     def __init__(self):
@@ -203,9 +209,9 @@ class TSDFServer(object):
 def main(args):
     rospy.init_node("dobot_grasp")
     dobot_grasp = DobotGraspController(args)
-    
-    while True:
-        dobot_grasp.run()
+    dobot_grasp.run()
+    # while True:
+    #     dobot_grasp.run()
 
 
 if __name__ == "__main__":

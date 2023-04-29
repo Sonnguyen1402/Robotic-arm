@@ -13,8 +13,8 @@ T_robot_base = {
 }
 
 T_cam_pose = {
-      'rotation': [0.6799, 0.6760, -0.2073, 0.1943], 
-      'translation': [0.006, -0.251, 1.005]
+      'rotation': [0.6780, 0.6780, -0.2008, 0.2008], # [0.6799, 0.6760, -0.2073, 0.1943]
+      'translation': [-0.106, -0.251, 1.025] #1.005
 }
 cam_frame_id = "camera_depth_optical_frame"
 cam_topic_name = "/camera/depth/image_rect_raw"
