@@ -80,20 +80,25 @@ class Control_Dobot_TCP (object):
                     utf8_msg = msg.decode("utf8")
                     if self.sended_flag:
                         if self.command_name == "O" and utf8_msg == "Opened":
-                            rospy.loginfo  ("Gripper is opened")
+                            rospy.loginfo  ("Opened")
                             self.command_executed = True                          
                             self.timeout_counter = 0
                             self.sended_flag = False
-                        elif self.command_name == "C" and utf8_msg == "Miss":
-                            rospy.loginfo  ("Grasp miss")
-                            self.sended_flag = False
+                        elif self.command_name == "C" and utf8_msg == "Closed":
+                            rospy.loginfo  ("Closed")
+                            self.command_executed = True
                             self.timeout_counter = 0
-                            # self.command_executed = True
-                        elif self.command_name == "C" and utf8_msg == "Grapped":
+                            self.sended_flag = False
+                        elif self.command_name == "S" and utf8_msg == "Grasped":
                             rospy.loginfo  ("Grasped")
                             self.command_executed = True
                             self.timeout_counter = 0
                             self.sended_flag = False
+                        elif self.command_name == "S" and utf8_msg == "Empty":
+                            rospy.loginfo  ("Empty")
+                            # self.command_executed = True
+                            self.sended_flag = False
+                            self.timeout_counter = 0
                         elif self.command_name == "M":
                             robot_pose = self.convert_msg(utf8_msg)
                             if not robot_pose == False:
@@ -140,7 +145,7 @@ class Control_Dobot_TCP (object):
                 return True
         return False
         
-    def grasp(self):
+    def close_gripper(self):
         if not self.sended_flag:
             self.command_name = "C"
             self.send_command("C")
@@ -150,12 +155,22 @@ class Control_Dobot_TCP (object):
                 return True
         return False
 
+    def status_gripper(self):
+        if not self.sended_flag:
+            self.command_name = "S"
+            self.send_command("S")
+            while self.sended_flag:
+                pass
+            if self.command_executed:
+                return True
+        return False
+
     def threaded(self):
         self.get_response()
         self.print_lock.release()
-        rospy.loginfo ("Listenner destroyed")
+        rospy.loginfo ("Listener destroyed")
         sys.exit(0)
             
-    def run_listenner(self):
+    def run_listener(self):
         self.print_lock.acquire()
         start_new_thread(self.threaded, ())

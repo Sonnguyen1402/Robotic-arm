@@ -1,7 +1,7 @@
 # Catkin_tools
 .catkin_tools/
 devel/
-
+notebooks/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
