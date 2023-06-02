@@ -11,6 +11,7 @@ import cv_bridge
 import numpy as np
 import rospy
 import sensor_msgs.msg
+import math
 
 import vgn.hardware_config as config
 
@@ -21,7 +22,7 @@ from vgn.perception import *
 from vgn.utils import ros_utils
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.dobot_control import Control_Dobot_TCP
-
+from pyquaternion import Quaternion
 
 
 class DobotGraspController(object):
@@ -76,11 +77,11 @@ class DobotGraspController(object):
         if len(grasps) == 0:
             rospy.loginfo("No grasps detected")
             return
-
+                       
         grasp, score = self.select_grasp(grasps, scores)
         vis.draw_grasp(grasp, score, self.finger_depth)
         rospy.loginfo("Selected grasp")
-
+        
         self.execute_grasp(grasp)
         rospy.loginfo("Grasp execution")
         
@@ -95,22 +96,52 @@ class DobotGraspController(object):
 
         return tsdf, pc
 
-    def select_grasp(self, grasps, scores):
-        # select the highest grasp
-        heights = np.empty(len(grasps))
-        for i, grasp in enumerate(grasps):
-            heights[i] = grasp.pose.translation[2]
-        idx = np.argmax(heights)
-        grasp, score = grasps[idx], scores[idx]
+    def hinge_loss(self, x):
+        return np.maximum(0, 1 - x)
 
+    def get_highest_grasp(self, grasps):
+        highest = 0.0
+        for i, grasp in enumerate(grasps):
+            if grasp.pose.translation[2] > highest:
+                highest = grasp.pose.translation[2]
+        return highest
+    
+    def get_grasp_score(self, grasp, highest_grasp):
+        grasp_translation = grasp.pose.translation
+        q = math.dist(grasp_translation, (0.0, 0.15, 0.30))
+
+        grasp_quaternion = grasp.pose.rotation
+        z_axis = np.array([0.,0.,1.])
+        a = np.matrix(grasp_quaternion.apply(z_axis))
+        g = np.matrix('[0; 0; -1]')
+        
+        return self.hinge_loss(0.5*(a* g +1)) * self.hinge_loss(q/0.45) * self.hinge_loss((highest_grasp - grasp_translation[2])/ (10*highest_grasp ))
+        
+    def select_grasp(self, grasps, scores):
+        grasp_scores = np.empty(len(grasps))
+        highest_grasp = self.get_highest_grasp(grasps)
+        for i, grasp in enumerate(grasps):
+            grasp_euler = grasp.pose.rotation.as_euler('xyz', degrees=True)
+            # Avoid front side-grasps
+            if (grasp_euler[0] < -90 and grasp_euler[0] > -150) and (grasp_euler[1] < 100 and grasp_euler[1] > 50) and (grasp_euler[2] < 100 and grasp_euler[2] > 10) :
+                grasp_scores[i] = 1
+            elif (grasp_euler[0] > 150 and grasp_euler[0] < 90) and (grasp_euler[1] > -100 and grasp_euler[1] < -50) and (grasp_euler[2] > -100 and grasp_euler[2] < -10):
+                grasp_scores[i] = 1
+            else:
+                # Calculate grasp score
+                grasp_scores[i] = self.get_grasp_score(grasp, highest_grasp)
+
+        idx = np.argmin(grasp_scores)
+        grasp, score = grasps[idx], scores[idx]
+        
         # make sure camera is pointing forward
         rot = grasp.pose.rotation
         axis = rot.as_matrix()[:, 0]
         if axis[0] < 0:
             grasp.pose.rotation = rot * Rotation.from_euler("z", np.pi)
 
-        return grasp, score
-    
+        return grasp, score        
+
     def to_pose_msg(self, pose):
         pose_list = np.r_[pose.translation, pose.rotation.as_euler('xyz', degrees=True)]
         pose_list[:3] = pose_list[:3] * 1000.0
@@ -156,7 +187,7 @@ class DobotGraspController(object):
         if z_drop < 110.0:
             z_drop = 110.0
         self.dobot.goto_pose([550, -50, z_drop + 200.0, 179, -0.9, -90]) 
-        self.dobot.goto_pose([550, -50, z_drop + 10.0, 179.0, -0.9, -90])
+        self.dobot.goto_pose([550, -50, z_drop + 5.0, 179.0, -0.9, -90])
         self.dobot.open_gripper()
         self.dobot.goto_pose([550, -50, z_drop + 150.0, 179, -0.9, -90])
 
