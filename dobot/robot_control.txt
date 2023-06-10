@@ -1,0 +1,75 @@
+-- Copy this code to DobotCRStudio
+
+
+local ip="192.168.1.6" -- IP address of the robot as a server
+local port=6001 -- Server port
+local err=0
+local socket=0 
+
+DhInit()
+DhSetForce(50)
+
+::create_server::
+err, socket = TCPCreate(true, ip, port)
+if err ~= 0 then
+	print("Failed to create socket, re-connecting")
+	Sleep(1000)
+	goto create_server
+end
+err = TCPStart(socket, 0)
+    if err ~= 0 then
+    	print("Failed to create server, re-connecting")
+    	TCPDestroy(socket)
+    	Sleep(1000)
+    	goto create_server
+    end
+
+function ReadData()
+	while true do
+		err, buf = TCPRead(socket, 0,"string")
+		print(buf)
+		data = buf.buf
+		if err ~= 0 then
+			print("Failed to read data, re-connecting")
+			TCPDestroy(socket)
+			Sleep(1000)
+			break
+		end
+		t={}
+		for w in string.gmatch(data, "([^',']+)") do -- tach chuoi
+			table.insert(t,w)
+		end
+		
+		if #t==7 and t[1]=="M" then
+			print("Pick position:", t)
+			local point2={coordinate={t[2],t[3],t[4],t[5],t[6], t[7]}}
+			Go(point2, "User=0 Tool=0 Speed=50 Accel=50 SYNC=1")
+			Sleep(1000)
+
+            local ct = tostring(GetPose().coordinate[1])
+			for i = 2, 6 do 
+                ct = ct..","..tostring(GetPose().coordinate[i])
+            end 
+            
+			print("currenPose: ", ct)
+			TCPWrite(socket,ct)
+		elseif t[1]=="O" then
+			DhOpen(0,1)
+			TCPWrite(socket,"Opened")
+		elseif t[1]=="C" then				
+			DhClose(0,1)
+			TCPWrite(socket,"Closed")
+			Sleep(1000)
+		elseif t[1]=="S" then
+			if DhGetStatus() == 2 then
+				TCPWrite(socket,"Grasped")
+			else 
+				TCPWrite(socket,"Empty")
+			end
+		else
+			TCPWrite(socket, "Command not found")
+		end	
+	end
+end
+
+ReadData()
