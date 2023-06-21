@@ -41,10 +41,11 @@ source /path/to/catkin_ws/devel/setup.zsh
 We use `Kinect v1` depth camera to gather 3D scene of  workspace. Follow [here](https://aibegins.net/2020/11/22/give-your-next-robot-3d-vision-kinect-v1-with-ros-noetic/) for installation.
 
 ## Robot Grasping
-Since Dobot CR5 collaborative robot with ROS only supported on Ubuntu 16.04/18.04, we decided to control robot through `DobotSCStudio` software. Visit [Dobot website](https://www.dobot-robots.com/products/cr-series/cr5.html) to download control software and manual.
+Since Dobot CR5 collaborative robot with ROS only supported on Ubuntu 16.04/18.04, we decided to control robot through `DobotSCStudio` software (run on windows computer). Visit [Dobot website](https://www.dobot-robots.com/products/cr-series/cr5.html) to download control software and manual.
 
-1. Copy code from [`dobot/robot_control.txt`](https://github.com/Sonnguyen1402/Grasp_Detection/blob/main/dobot/robot_control.txt) to script section in `DobotSCStudio` software. Then, run the script.
-2. On the 20.04 computer, launch `Kinect` camera driver and run the system:
+1. Connect all computers to robot network.
+2. On the Windows computer, copy code from [`dobot/robot_control.txt`](https://github.com/Sonnguyen1402/Grasp_Detection/blob/main/dobot/robot_control.txt) to script section in `DobotSCStudio` software. Then, run the script.
+3. On the Ubuntu computer, launch `Kinect` camera driver and run the system:
 ```
 roslaunch freenect_launch freenect.launch
 python scripts/dobot_grasp.py --model data/models/vgn_conv.pth
