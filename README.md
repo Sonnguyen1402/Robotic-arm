@@ -44,7 +44,7 @@ We use `Kinect v1` depth camera to gather 3D scene of  workspace. Follow [here](
 Since Dobot CR5 collaborative robot with ROS only supported on Ubuntu 16.04/18.04, we decided to control robot through `DobotSCStudio` software (run on windows computer). Visit [Dobot website](https://www.dobot-robots.com/products/cr-series/cr5.html) to download control software and manual.
 
 1. Connect all computers to robot network.
-2. On the Windows computer, copy code from [`dobot/robot_control.txt`](https://github.com/Sonnguyen1402/Grasp_Detection/blob/main/dobot/robot_control.txt) to script section in `DobotSCStudio` software. Then, run the script.
+2. On the Windows computer, copy code from [`dobot/robot_control.txt`](https://github.com/Sonnguyen1402/Robotic-arm/blob/main/dobot/robot_control.txt) to script section in `DobotSCStudio` software. Then, run the script.
 3. On the Ubuntu computer, launch `Kinect` camera driver and run the system:
 ```
 roslaunch freenect_launch freenect.launch
